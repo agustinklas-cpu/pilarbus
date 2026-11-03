@@ -1,0 +1,21 @@
+name: PilarBus CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate repository structure
+        shell: bash
+        run: |
+          test -f README.md
+          echo "Estructura básica validada."
+          echo "IMPORTANTE: agregar aquí los comandos reales de build y tests del proyecto."
