@@ -2,20 +2,132 @@ name: PilarBus CI
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, develop]
   push:
-    branches: [main]
+    branches: [main, develop]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
-  validate:
+  # 1) Entregables de planificación (siempre corre)
+  planning:
+    name: Validar planificación
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - name: Validar README, kanban y límite WIP
+        run: python3 scripts/validate_planning.py
 
-      - name: Validate repository structure
-        shell: bash
+  # 2) App móvil Expo / React Native (corre cuando el código está en el repo)
+  app:
+    name: App Expo (lint, tipos, tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detectar la app
+        id: detect
         run: |
-          test -f README.md
-          echo "Estructura básica validada."
-          echo "IMPORTANTE: agregar aquí los comandos reales de build y tests del proyecto."
+          dir=""
+          for d in . frontend app; do
+            if [ -f "$d/package.json" ]; then dir="$d"; break; fi
+          done
+          if [ -z "$dir" ]; then
+            echo "::warning::No se encontró package.json: todavía no hay código de la app en el repo. Se omiten lint, tipos y tests."
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ -f "$dir/yarn.lock" ]; then pm=yarn; else pm=npm; fi
+          echo "found=true" >> "$GITHUB_OUTPUT"
+          echo "dir=$dir" >> "$GITHUB_OUTPUT"
+          echo "pm=$pm" >> "$GITHUB_OUTPUT"
+          echo "App en '$dir' usando $pm"
+
+      - uses: actions/setup-node@v4
+        if: steps.detect.outputs.found == 'true'
+        with:
+          node-version: 20
+
+      - name: Instalar dependencias
+        if: steps.detect.outputs.found == 'true'
+        working-directory: ${{ steps.detect.outputs.dir }}
+        run: |
+          if [ "${{ steps.detect.outputs.pm }}" = "yarn" ]; then
+            yarn install --frozen-lockfile
+          elif [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Lint
+        if: steps.detect.outputs.found == 'true'
+        working-directory: ${{ steps.detect.outputs.dir }}
+        run: |
+          if grep -q '"lint"' package.json; then
+            ${{ steps.detect.outputs.pm }} run lint
+          else
+            echo "::notice::No hay script 'lint' en package.json."
+          fi
+
+      - name: Chequeo de tipos (TypeScript)
+        if: steps.detect.outputs.found == 'true'
+        working-directory: ${{ steps.detect.outputs.dir }}
+        run: |
+          if [ -f tsconfig.json ]; then
+            npx tsc --noEmit
+          else
+            echo "::notice::No hay tsconfig.json: se omite el chequeo de tipos."
+          fi
+
+      - name: Tests (Jest)
+        if: steps.detect.outputs.found == 'true'
+        working-directory: ${{ steps.detect.outputs.dir }}
+        env:
+          CI: "true"
+        run: |
+          if grep -q '"test"' package.json; then
+            ${{ steps.detect.outputs.pm }} test --ci --watchAll=false
+          else
+            echo "::warning::No hay script 'test' en package.json: la app no tiene pruebas todavía."
+          fi
+
+  # 3) Backend Python (solo si existe backend/requirements.txt)
+  backend:
+    name: Backend (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detectar backend
+        id: detect
+        run: |
+          if [ -f backend/requirements.txt ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::No hay backend/requirements.txt: se omite el job de backend."
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-python@v5
+        if: steps.detect.outputs.found == 'true'
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Instalar dependencias y correr pytest
+        if: steps.detect.outputs.found == 'true'
+        working-directory: backend
+        run: |
+          pip install -r requirements.txt pytest
+          if find . -name 'test_*.py' -o -name '*_test.py' | grep -q .; then
+            pytest -q
+          else
+            echo "::warning::No hay archivos de test en backend/."
+          fi
