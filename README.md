@@ -28,4 +28,4 @@ El workflow en `.github/workflows/ci.yml` se ejecuta en Pull Requests y en cambi
 - link de nuestro prototipo de pagina
 https://pilar-bus-urbano--agustinklas.replit.app
 
-link tello: https://trello.com/invite/b/6ae93f95bc44c25dfc381670/ATTI47041798eb959ad1c889c622abd6b5903D4624E3/pilarbus-desarrollo-agil-🚍
+- link tello: https://trello.com/b/sVGeysrx
