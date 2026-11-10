@@ -24,3 +24,6 @@ El workflow en `.github/workflows/ci.yml` se ejecuta en Pull Requests y en cambi
 - `kanban_cards.csv`: ocho tarjetas iniciales para cargar en Trello.
 - `.github/workflows/ci.yml`: ejemplo inicial de CI.
 - `trello_board_setup.md`: instrucciones de configuración del tablero.
+
+- link de nuestro prototipo de pagina
+https://pilar-bus-urbano--agustinklas.replit.app
