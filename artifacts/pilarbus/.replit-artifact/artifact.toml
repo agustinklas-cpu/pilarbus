@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "PilarBus"
+description = "Una plataforma web adaptable a celulares para que los vecinos de Pilar consulten recorridos y ubicación de colectivos en el mapa, y envíen reclamos. Incluye un área administrativa para gestionar, resolver y eliminar manualmente reclamos resueltos."
+version = "1.0.0"
+id = "artifacts/pilarbus"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18455
+
+[services.development]
+run = "pnpm --filter @workspace/pilarbus run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/pilarbus", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/pilarbus/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18455"
+BASE_PATH = "/"

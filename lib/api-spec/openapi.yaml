@@ -1,0 +1,428 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: complaints
+    description: Reclamos del servicio de colectivos
+  - name: service-notices
+    description: Novedades del servicio de colectivos
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /complaints:
+    get:
+      operationId: listComplaints
+      tags: [complaints]
+      summary: List complaints for administration
+      parameters:
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+            enum: [all, open, resolved]
+            default: all
+      responses:
+        "200":
+          description: Complaints
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Complaint"
+    post:
+      operationId: createComplaint
+      tags: [complaints]
+      summary: Submit an authenticated passenger complaint
+      security:
+        - clerkSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ComplaintInput"
+      responses:
+        "201":
+          description: Complaint created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Complaint"
+        "401":
+          description: Sign in required
+  /complaints/me:
+    get:
+      operationId: listMyComplaints
+      tags: [complaints]
+      summary: List complaints owned by the signed-in passenger
+      security:
+        - clerkSession: []
+      responses:
+        "200":
+          description: The current passenger's complaint history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PassengerComplaint"
+        "401":
+          description: Sign in required
+  /complaints/summary:
+    get:
+      operationId: getComplaintSummary
+      tags: [complaints]
+      summary: Get complaint totals for administration
+      responses:
+        "200":
+          description: Complaint totals
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComplaintSummary"
+  /complaints/{id}:
+    patch:
+      operationId: updateComplaint
+      tags: [complaints]
+      summary: Update a complaint's status and admin note
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ComplaintUpdate"
+      responses:
+        "200":
+          description: Complaint updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Complaint"
+        "404":
+          description: Complaint not found
+    delete:
+      operationId: deleteComplaint
+      tags: [complaints]
+      summary: Delete a resolved complaint manually
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "204":
+          description: Resolved complaint deleted
+        "404":
+          description: Complaint not found
+        "409":
+          description: Only resolved complaints can be deleted
+  /service-notices:
+    get:
+      operationId: listServiceNotices
+      tags: [service-notices]
+      summary: List current and recent service notices
+      responses:
+        "200":
+          description: Service notices visible to passengers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ServiceNotice"
+    post:
+      operationId: createServiceNotice
+      tags: [service-notices]
+      summary: Publish a route change notice and email users
+      security:
+        - clerkSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ServiceNoticeInput"
+      responses:
+        "201":
+          description: Notice published with email delivery results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceNoticePublishResult"
+        "401":
+          description: Sign in required
+        "403":
+          description: Municipal admin access required
+  /service-notices/{id}:
+    patch:
+      operationId: updateServiceNotice
+      tags: [service-notices]
+      summary: Resolve or reopen a service notice
+      security:
+        - clerkSession: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ServiceNoticeUpdate"
+      responses:
+        "200":
+          description: Notice status updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceNotice"
+        "401":
+          description: Sign in required
+        "403":
+          description: Municipal admin access required
+        "404":
+          description: Notice not found
+  /service-notices/{id}/retry-email:
+    post:
+      operationId: retryServiceNoticeEmail
+      tags: [service-notices]
+      summary: Retry failed emails without resending successful deliveries
+      security:
+        - clerkSession: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Email delivery retry results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailDispatchSummary"
+        "401":
+          description: Sign in required
+        "403":
+          description: Municipal admin access required
+        "404":
+          description: Notice not found
+components:
+  securitySchemes:
+    clerkSession:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+    Complaint:
+      type: object
+      properties:
+        id:
+          type: integer
+        category:
+          type: string
+          enum: [service, delay, vehicle, stop, accessibility, other]
+        routeName:
+          type: [string, "null"]
+        message:
+          type: string
+        contactName:
+          type: [string, "null"]
+        contactEmail:
+          type: [string, "null"]
+        status:
+          type: string
+          enum: [open, resolved]
+        adminNote:
+          type: [string, "null"]
+        createdAt:
+          type: string
+          format: date-time
+        resolvedAt:
+          type: [string, "null"]
+          format: date-time
+      required: [id, category, message, status, createdAt]
+    ComplaintInput:
+      type: object
+      properties:
+        category:
+          type: string
+          enum: [service, delay, vehicle, stop, accessibility, other]
+        routeName:
+          type: string
+        message:
+          type: string
+          minLength: 4
+          maxLength: 3000
+        contactName:
+          type: string
+          maxLength: 120
+        contactEmail:
+          type: string
+          format: email
+      required: [category, message]
+    ComplaintUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [open, resolved]
+        adminNote:
+          type: [string, "null"]
+          maxLength: 2000
+      required: [status]
+    PassengerComplaint:
+      type: object
+      properties:
+        id:
+          type: integer
+        category:
+          type: string
+          enum: [service, delay, vehicle, stop, accessibility, other]
+        routeName:
+          type: [string, "null"]
+        message:
+          type: string
+        status:
+          type: string
+          enum: [open, resolved]
+        createdAt:
+          type: string
+          format: date-time
+        resolvedAt:
+          type: [string, "null"]
+          format: date-time
+      required: [id, category, message, status, createdAt]
+    ServiceNotice:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        noticeType:
+          type: string
+          enum: [detour, interruption, delay, other]
+        routeNames:
+          type: array
+          items:
+            type: string
+        message:
+          type: string
+        status:
+          type: string
+          enum: [active, resolved]
+        createdAt:
+          type: string
+          format: date-time
+        resolvedAt:
+          type: [string, "null"]
+          format: date-time
+      required: [id, title, noticeType, routeNames, message, status, createdAt]
+    ServiceNoticeInput:
+      type: object
+      properties:
+        requestId:
+          type: string
+          format: uuid
+        title:
+          type: string
+          minLength: 4
+          maxLength: 160
+        noticeType:
+          type: string
+          enum: [detour, interruption, delay, other]
+        routeNames:
+          type: array
+          maxItems: 30
+          items:
+            type: string
+            minLength: 1
+            maxLength: 80
+        message:
+          type: string
+          minLength: 8
+          maxLength: 3000
+      required: [requestId, title, noticeType, routeNames, message]
+    ServiceNoticeUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [active, resolved]
+      required: [status]
+    EmailDispatchSummary:
+      type: object
+      properties:
+        attempted:
+          type: integer
+        sent:
+          type: integer
+        failed:
+          type: integer
+      required: [attempted, sent, failed]
+    ServiceNoticePublishResult:
+      type: object
+      properties:
+        notice:
+          $ref: "#/components/schemas/ServiceNotice"
+        emailSummary:
+          $ref: "#/components/schemas/EmailDispatchSummary"
+      required: [notice, emailSummary]
+    ComplaintSummary:
+      type: object
+      properties:
+        total:
+          type: integer
+        open:
+          type: integer
+        resolved:
+          type: integer
+        lastUpdatedAt:
+          type: [string, "null"]
+          format: date-time
+      required: [total, open, resolved]
+

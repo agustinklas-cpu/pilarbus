@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 42" fill="none">
+  <rect width="42" height="42" rx="13" fill="#1D594E"/>
+  <path d="M12 14.5h18v15H12z" stroke="#F7F4E8" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M15.5 18.5h4v4h-4zm7 0h4v4h-4zM15.5 26h4m6 0h1" stroke="#F7F4E8" stroke-width="1.8" stroke-linecap="round"/>
+  <circle cx="16.5" cy="30" r="2" fill="#D8A176"/><circle cx="26" cy="30" r="2" fill="#D8A176"/>
+  <text x="51" y="28" fill="#203B34" font-family="Manrope, sans-serif" font-size="22" font-weight="800" letter-spacing="-1.2">Pilar</text>
+  <text x="103" y="28" fill="#B75A37" font-family="Manrope, sans-serif" font-size="22" font-weight="800" letter-spacing="-1.2">Bus</text>
+</svg>
